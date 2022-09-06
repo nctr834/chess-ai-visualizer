@@ -11,20 +11,23 @@ piece_values = {chess.PAWN: 1,
                 chess.KING: 0}
 
 
-def get_best_move(show_moves, board, move_queue):
+def get_best_move(board, move_queue):
     global best_move, count, moves, top_move_lines
 
     best_move = None
     count = 0
     moves = []
     top_move_lines = []
-    nega_max_ab(show_moves, board, board.legal_moves, DEPTH,
+    nega_max_ab(board, board.legal_moves, DEPTH,
                 1 if board.turn == chess.WHITE else -1, move_queue)
     # print items in the queue
     # while not move_queue.empty():
     #    print(move_queue.get())
-    print(count)
-    move_queue.put((best_move, DEPTH))
+    print(str(count)+" moves evaluated")
+    if move_queue:
+        move_queue.put((best_move, DEPTH))
+    else:
+        return best_move
 
 
 def get_random_move(legal_moves):
@@ -32,7 +35,7 @@ def get_random_move(legal_moves):
     return random.choice(legal_moves)
 
 
-def nega_max_ab(show_moves, board, legal_moves, depth, turn_mult, move_queue, alpha=-CHECKMATE, beta=CHECKMATE):
+def nega_max_ab(board, legal_moves, depth, turn_mult, move_queue, alpha=-CHECKMATE, beta=CHECKMATE):
     global best_move, count, moves, top_move_lines
     count += 1
     if board.is_game_over() or depth == 0:
@@ -40,18 +43,20 @@ def nega_max_ab(show_moves, board, legal_moves, depth, turn_mult, move_queue, al
     max_eval = float('-inf')
     for move in legal_moves:
         board.push(move)
-        if show_moves and depth >= 1:
-            # moves.append(move)
-            move_queue.put((move, depth))
-        val = -nega_max_ab(show_moves, board, board.legal_moves,
+        if move_queue is None:
+            moves.append((move, depth))
+
+        val = -nega_max_ab(board, board.legal_moves,
                            depth - 1, -turn_mult, move_queue, -beta, -alpha)
-        #moves = []
         board.pop()
         if val > max_eval:
             max_eval = val
             if depth == DEPTH:
                 # top_move_lines.append(moves)
-                #print(str(top_move_lines) + ": " + str(depth))
+                #moves = []
+                # print(str(top_move_lines) + ": " + str(depth))
+                # moves.append(move)
+                #print(str(move) + ": " + str(turn_mult*evaluate_board(board)))
                 best_move = move
         alpha = max(alpha, max_eval)
         if alpha >= beta:

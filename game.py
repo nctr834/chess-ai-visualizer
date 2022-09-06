@@ -1,15 +1,16 @@
-import sys
-import chess
-import pygame
 import chess_ai
-import multiprocessing
+import pygame
+import chess
 from multiprocessing import Process, Queue
+import os
+os.environ['PYGAME_HIDE_SUPPORT_PROMPT'] = 'hide'
+
+
 WIDTH = HEIGHT = 700
 DIMENSION = 8
 SQUARE_SIZE = HEIGHT // DIMENSION
 MAX_FPS = 10000
 IMAGES = {}
-
 """ IF AI IS ENABLED, DON'T LET PLAYER MAKE MOVES WHEN REDOING OR UNDOING MOVES """
 
 
@@ -30,20 +31,20 @@ def main():
         ([WIDTH, HEIGHT]), pygame.DOUBLEBUF, pygame.HWSURFACE)
     pygame.display.set_caption("Chess")
     clock = pygame.time.Clock()
-    #screen.fill((255, 255, 255))
-    board = chess.Board()
+    # screen.fill((255, 255, 255))
+    board = chess.Board(
+        "7k/p1r2b2/5q2/1p1p1pR1/5P2/P7/1P2Q2P/1K4R1 w - - 0 32")
     load_images()
     running = True
     squares_selected = []
     game_over = False
     human = True
     popped_moves = []
-    show_ai_moves = False
+    show_ai_moves = True
     ai_computing = False
     process = None
-    print(board)
-    print(str(chess_ai.evaluate_board(board)) + "\n")
     while running:
+        popped_moves_len = len(popped_moves)
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 running = False
@@ -64,8 +65,9 @@ def main():
                             squares_selected.append(square)
                     else:
                         # if piece is same color as first piece, replace
-                        if piece is not None and piece.color == board.piece_at(squares_selected[0]).color:
-                            squares_selected.pop()
+                        if piece is not None:
+                            if piece.color == board.piece_at(squares_selected[0]).color:
+                                squares_selected.pop()
                         squares_selected.append(square)
                         draw_game(screen, board)
                 else:
@@ -74,24 +76,22 @@ def main():
                     if len(squares_selected) != 1:
                         squares_selected = []
             elif event.type == pygame.KEYDOWN:
-                if ai_computing:
-                    process.terminate()
-                    ai_computing = False
                 # undo last move
                 if len(board.move_stack) != 0 and event.key == pygame.K_LEFT:
                     popped_moves.append(board.pop())
                 # redo last move
-                elif len(popped_moves) != 0 and event.key == pygame.K_RIGHT:
+                elif popped_moves_len != 0 and event.key == pygame.K_RIGHT:
                     board.push(popped_moves.pop())
-        if len(squares_selected) == 2 and human:
+                if (popped_moves_len != 0) and ai_computing:
+                    process.terminate()
+                    ai_computing = False
+        if len(squares_selected) == 2 and human and popped_moves_len == 0:
             move = chess.Move(
                 squares_selected[0], squares_selected[1])
-
             square = squares_selected[0]
-            if (able_to_promote(board, move, board.piece_at(square))):
-                move.promotion = chess.QUEEN
-
-            if board.is_legal(move) and not ai_computing:
+            if board.is_legal(move):
+                if (able_to_promote(board, move, board.piece_at(square))):
+                    move.promotion = chess.QUEEN
                 board.push(move)
                 draw_game(screen, board)
                 human = False
@@ -110,75 +110,78 @@ def main():
         pygame.display.flip()
 
         # ai move
-        if not human and not board.is_game_over():
-            if not ai_computing:
-                ai_computing = True
-                move_queue = Queue()
-                process = Process(
-                    target=chess_ai.get_best_move, args=(show_ai_moves, board, move_queue))
-                process.start()
-
-                # so white can check legal moves while ai is computing
-                if not show_ai_moves:
-                    board.turn = not board.turn
-            if not process.is_alive():
-                # reverting turn back
-                print("AI has finished computing.")
-                if not show_ai_moves:
-                    board.turn = not board.turn
-                squares_selected = []
-                if show_ai_moves is True:
-                    ai_moves(screen, board, clock, move_queue)
-                move = move_queue.get()
-                if move is None:
-                    move = chess_ai.get_random_move(board.legal_moves)
-                board.push(move[0])
-                ai_computing = False
+        if not human and not game_over and popped_moves_len == 0:
+            print("AI is thinking...")
+            if show_ai_moves == True:
+                move = chess_ai.get_best_move(board, None)
+                ai_moves(screen, board, clock, chess_ai.moves)
+                board.push(move)
                 human = True
+                draw_game(screen, board)
+            else:
+                if not ai_computing:
+                    ai_computing = True
+                    move_queue = Queue()
+                    process = Process(
+                        target=chess_ai.get_best_move, args=(board, move_queue))
+                    process.start()
+                    # so white can check legal moves while ai is computing
+                    board.turn = not board.turn
+                if not process.is_alive():
+                    # reverting turn back
+                    board.turn = not board.turn
+                    print("AI has finished computing.")
+                    squares_selected = []
+                    move = move_queue.get()
+                    if move is None:
+                        move = chess_ai.get_random_move(board.legal_moves)
+                    board.push(move[0])
+                    ai_computing = False
+                    human = True
+            print("\n"+str(chess_ai.evaluate_board(board)) + "\n")
 
 
-def ai_moves(screen, board, clock, move_queue):
+def ai_moves(screen, board, clock, moves):
     '''ai - clean up'''
-    while move_queue.qsize() > 0:
-        print(move_queue.qsize())
-        moves = move_queue.get()
-        if moves[0] is not None:
-            # green if no prune - pink if prunes at depth 2
-            """ visualize_line(
-                screen, board, moves[1], clock, (0, 180, 160), moves[0]) if (moves[1] == 3) else visualize_line(screen, board, moves[1], clock, "pink", moves[0]) """
-            if moves[1] == 3:
-                visualize_line(
-                    screen, board, moves[1], clock, (0, 180, 160), moves[0])
-            elif moves[1] == 2:
-                visualize_line(
-                    screen, board, moves[1], clock, "pink", moves[0])
-                # draw_game(screen, board, ("gray"), ("white"))
-            pygame.display.flip()
-    # board.push(ai_move)
-    draw_game(screen, board)
-    print(str(board))
-    # else:
-    #   board.push(chess_ai.get_random_move(board.legal_moves))
-
-
-def visualize_line(screen, board, depth, clock, color, move):
-    for i in range(depth):
-        try:
-            board.push(move)
-        except:
-            pass
-        # board.turn = board.turn
-        # chess_ai.moves.remove(chess_ai.moves[0])
-        clock.tick(100)
-        # clock.tick(10000) if depth == 3 else clock.tick(10000)
-        draw_game(screen, board, color, ("white"))
+    while moves:
+        board.turn = chess.BLACK
+        current_line = []
+        move = moves.pop(0)
+        current_line.append(move)
+        while moves and move[1] != 1:
+            current_line.append(move)
+            move = moves.pop(0)
+            # print(current_line)
+            # board.turn = chess.BLACK
+        visualize_line(
+            screen, board, clock, current_line)
         pygame.display.flip()
-    for i in range(depth):
+
+
+def visualize_line(screen, board, clock, current_line):
+    size_current_line = len(current_line)
+    while current_line:
+        move = current_line.pop()[0]
+        if not board.is_legal(move):
+            move = chess_ai.get_random_move(board.legal_moves)
+        if size_current_line != 1:
+            board.push(move)
+        else:
+            size_current_line -= 1
+            break
+        clock.tick(5) if size_current_line == 3 else clock.tick(60)
+        color = (size_current_line*50, 180 -
+                 size_current_line*10, 160+size_current_line*20)
+        draw_game(screen, board, color)
+        pygame.display.flip()
+    for i in range(size_current_line):
         if board.move_stack:
             board.pop()
-            clock.tick(100)
-        draw_game(screen, board, color, ("white"))
-        pygame.display.flip()
+            pygame.display.flip()
+    clock.tick(5) if size_current_line == 3 else clock.tick(60)
+    # draw_game(screen, board, (180, 180, 180), ("white"))
+    # clock.tick(250)
+    pygame.display.flip()
 
 
 def get_terminate_condition(board):
@@ -203,8 +206,19 @@ def able_to_promote(board, move, piece):
     return chess.square_rank(move.to_square) == 7 and board.turn == chess.WHITE or chess.square_rank(move.to_square) == 0 and board.turn == chess.BLACK
 
 
-""" def move_animation(screen, board, move, clock):
-    return """
+""" def highlight_square(screen, board, square):
+    square ^= 56
+    x = square % 8
+    y = square // 8
+    pygame.draw.rect(screen, (255, 255, 0), pygame.Rect(
+        x * SQUARE_SIZE, y * SQUARE_SIZE, SQUARE_SIZE, SQUARE_SIZE))
+    piece = board.piece_at(square ^ 56)
+    if piece:
+        screen.blit(IMAGES[str(int(piece.color)) + piece.symbol()],
+                    (x * SQUARE_SIZE,
+                    y * SQUARE_SIZE))
+
+ """
 
 
 def highlight_moves(screen, board, square):
@@ -255,6 +269,4 @@ def draw_pieces(screen, board):
 
 
 if __name__ == '__main__':
-    multiprocessing.freeze_support()
     main()
-    sys.exit()
