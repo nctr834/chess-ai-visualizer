@@ -6,9 +6,11 @@ import os
 os.environ['PYGAME_HIDE_SUPPORT_PROMPT'] = 'hide'
 
 
-WIDTH = HEIGHT = 700
+BOARD_WIDTH = BOARD_HEIGHT = 700
+MOVE_HISTORY_WIDTH = 200
+MOVE_HISTORY_HEIGHT = 700
 DIMENSION = 8
-SQUARE_SIZE = HEIGHT // DIMENSION
+SQUARE_SIZE = BOARD_HEIGHT // DIMENSION
 MAX_FPS = 10000
 IMAGES = {}
 """ IF AI IS ENABLED, DON'T LET PLAYER MAKE MOVES WHEN REDOING OR UNDOING MOVES """
@@ -28,21 +30,23 @@ def main():
     # "7k/p1r2b2/5q2/1p1p1p1R/5P2/P7/1P2Q2P/1K4R1 b - - 1 32"
     pygame.init()
     screen = pygame.display.set_mode(
-        ([WIDTH, HEIGHT]), pygame.DOUBLEBUF, pygame.HWSURFACE)
+        ([BOARD_WIDTH + MOVE_HISTORY_WIDTH, BOARD_HEIGHT]), pygame.DOUBLEBUF, pygame.HWSURFACE)
     pygame.display.set_caption("Chess")
     clock = pygame.time.Clock()
     # screen.fill((255, 255, 255))
     board = chess.Board(
-        "7k/p1r2b2/5q2/1p1p1pR1/5P2/P7/1P2Q2P/1K4R1 w - - 0 32")
+    )
     load_images()
     running = True
     squares_selected = []
     game_over = False
     human = True
     popped_moves = []
-    show_ai_moves = True
+    show_ai_moves = False
+    move_queue = Queue()
     ai_computing = False
     process = None
+    move_history_font = pygame.font.SysFont("comicsans", 15)
     while running:
         popped_moves_len = len(popped_moves)
         for event in pygame.event.get():
@@ -54,7 +58,7 @@ def main():
                 x = mouse_pos[0] // SQUARE_SIZE
                 y = mouse_pos[1] // SQUARE_SIZE
 
-                # square ^ 56 from the python-chess docs; need to mirror the square vertically. ##### APPLY TRANSFORM!!!!
+                # square ^ 56 from the python-chess docs; need to mirror the square vertically.
                 square = chess.square(x, y) ^ 56
                 piece = board.piece_at(square)
 
@@ -69,7 +73,8 @@ def main():
                             if piece.color == board.piece_at(squares_selected[0]).color:
                                 squares_selected.pop()
                         squares_selected.append(square)
-                        draw_game(screen, board)
+                        draw_game(screen, board,
+                                  move_history_font, ai_computing)
                 else:
                     # Only clear if the size of squares_selected isn't 1.
                     # If it is 1 in this else, it means that the user has selected the same piece twice, and there is no need to remove it from the list (improves usability).
@@ -93,11 +98,11 @@ def main():
                 if (able_to_promote(board, move, board.piece_at(square))):
                     move.promotion = chess.QUEEN
                 board.push(move)
-                draw_game(screen, board)
+                draw_game(screen, board, move_history_font, ai_computing)
                 human = False
             squares_selected = []
 
-        draw_game(screen, board)
+        draw_game(screen, board, move_history_font, ai_computing)
         # Must run after board is updated.
         if len(squares_selected) == 1:
             highlight_moves(screen, board, squares_selected[0])
@@ -111,17 +116,18 @@ def main():
 
         # ai move
         if not human and not game_over and popped_moves_len == 0:
-            print("AI is thinking...")
+            if not ai_computing:
+                print("AI is thinking...")
             if show_ai_moves == True:
                 move = chess_ai.get_best_move(board, None)
-                ai_moves(screen, board, clock, chess_ai.moves)
+                ai_moves(screen, board, clock,
+                         chess_ai.moves, move_history_font, ai_computing)
                 board.push(move)
                 human = True
-                draw_game(screen, board)
+                draw_game(screen, board, move_history_font, ai_computing)
             else:
                 if not ai_computing:
                     ai_computing = True
-                    move_queue = Queue()
                     process = Process(
                         target=chess_ai.get_best_move, args=(board, move_queue))
                     process.start()
@@ -138,27 +144,38 @@ def main():
                     board.push(move[0])
                     ai_computing = False
                     human = True
-            print("\n"+str(chess_ai.evaluate_board(board)) + "\n")
+
+        """     process = Process(
+                target=chess_ai.get_best_move, args=(board, move_queue))
+            process.start()
+            if not process.is_alive():
+                move = move_queue.get()
+                if move is None:
+                    move = chess_ai.get_random_move(board.legal_moves)
+                board.push(move[0])
+                print(chess_ai.evaluate_board(board))
+                board.pop()
+                ai_computing = False """
 
 
-def ai_moves(screen, board, clock, moves):
+def ai_moves(screen, board, clock, moves, move_history_font, ai_computing):
     '''ai - clean up'''
     while moves:
         board.turn = chess.BLACK
         current_line = []
-        move = moves.pop(0)
+        move = moves.pop()
         current_line.append(move)
         while moves and move[1] != 1:
             current_line.append(move)
-            move = moves.pop(0)
+            move = moves.pop()
             # print(current_line)
             # board.turn = chess.BLACK
         visualize_line(
-            screen, board, clock, current_line)
+            screen, board, clock, current_line, move_history_font, ai_computing)
         pygame.display.flip()
 
 
-def visualize_line(screen, board, clock, current_line):
+def visualize_line(screen, board, clock, current_line, move_history_font, ai_computing):
     size_current_line = len(current_line)
     while current_line:
         move = current_line.pop()[0]
@@ -172,7 +189,7 @@ def visualize_line(screen, board, clock, current_line):
         clock.tick(5) if size_current_line == 3 else clock.tick(60)
         color = (size_current_line*50, 180 -
                  size_current_line*10, 160+size_current_line*20)
-        draw_game(screen, board, color)
+        draw_game(screen, board, move_history_font, ai_computing, color)
         pygame.display.flip()
     for i in range(size_current_line):
         if board.move_stack:
@@ -206,21 +223,6 @@ def able_to_promote(board, move, piece):
     return chess.square_rank(move.to_square) == 7 and board.turn == chess.WHITE or chess.square_rank(move.to_square) == 0 and board.turn == chess.BLACK
 
 
-""" def highlight_square(screen, board, square):
-    square ^= 56
-    x = square % 8
-    y = square // 8
-    pygame.draw.rect(screen, (255, 255, 0), pygame.Rect(
-        x * SQUARE_SIZE, y * SQUARE_SIZE, SQUARE_SIZE, SQUARE_SIZE))
-    piece = board.piece_at(square ^ 56)
-    if piece:
-        screen.blit(IMAGES[str(int(piece.color)) + piece.symbol()],
-                    (x * SQUARE_SIZE,
-                    y * SQUARE_SIZE))
-
- """
-
-
 def highlight_moves(screen, board, square):
     # Highlight legal squares
     for move in board.legal_moves:
@@ -242,12 +244,31 @@ def highlight_moves(screen, board, square):
     pygame.display.flip()
 
 
-def draw_game(screen, board, color_one=("lightblue"), color_two=("white")):
+def draw_game(screen, board, font, ai_computing, color_one=("lightblue"), color_two=("white")):
     draw_board(screen, color_one, color_two)
     draw_pieces(screen, board)
+    if ai_computing:
+        draw_move_history(screen, board, font)
 
 
-def draw_board(screen=pygame.display.set_mode((WIDTH, HEIGHT)), color_one=("lightblue"), color_two=("white")):
+def draw_move_history(screen, board, font):
+    move_history = board.move_stack
+    move_history_rect = pygame.Rect(
+        BOARD_WIDTH, 0, MOVE_HISTORY_WIDTH, MOVE_HISTORY_HEIGHT)
+    for i in range(len(move_history)):
+        move = move_history[i]
+        move_num = i // 2 + 1
+        if(i % 2 == 0):
+            text = font.render(
+                str(move_num)+": "+move.uci(), 1, (255, 255, 255))
+            text_move = move_history_rect.move(0, 10 * i)
+        else:
+            text = font.render(move.uci(), 1, (255, 255, 255))
+            text_move = move_history_rect.move(100*i % 200, 10 * (i-1))
+        screen.blit(text, text_move)
+
+
+def draw_board(screen=pygame.display.set_mode((BOARD_WIDTH, BOARD_HEIGHT)), color_one=("lightblue"), color_two=("white")):
     for i in range(DIMENSION):
         for j in range(DIMENSION):
             if (i + j) % 2 == 0:

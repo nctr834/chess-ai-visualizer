@@ -10,6 +10,70 @@ piece_values = {chess.PAWN: 1,
                 chess.QUEEN: 9,
                 chess.KING: 0}
 
+knight_weights = [[1, 1, 1, 1, 1, 1, 1, 1],
+                  [1, 2, 2, 2, 2, 2, 2, 1],
+                  [1, 2, 3, 3, 3, 3, 2, 1],
+                  [1, 2, 3, 4, 4, 3, 2, 1],
+                  [1, 2, 3, 4, 4, 3, 2, 1],
+                  [1, 2, 3, 3, 3, 3, 2, 1],
+                  [1, 2, 2, 2, 2, 2, 2, 1],
+                  [1, 1, 1, 1, 1, 1, 1, 1]]
+
+bishop_weights = [[4, 3, 2, 1, 1, 2, 3, 4],
+                  [3, 4, 3, 2, 2, 3, 4, 3],
+                  [2, 3, 4, 3, 3, 4, 3, 2],
+                  [1, 2, 3, 4, 4, 3, 2, 1],
+                  [1, 2, 3, 4, 4, 3, 2, 1],
+                  [2, 3, 4, 3, 3, 4, 3, 2],
+                  [3, 4, 3, 2, 2, 3, 4, 3],
+                  [4, 3, 2, 1, 1, 2, 3, 4]]
+
+rook_weights = [[4, 4, 4, 4, 4, 4, 4, 4],
+                [3, 3, 3, 3, 3, 3, 3, 3],
+                [2, 2, 2, 2, 2, 2, 2, 2],
+                [1, 2, 3, 4, 4, 3, 2, 1],
+                [1, 2, 3, 4, 4, 3, 2, 1],
+                [2, 2, 2, 2, 2, 2, 2, 2],
+                [3, 3, 3, 3, 3, 3, 3, 3],
+                [4, 4, 4, 4, 4, 4, 4, 4]]
+
+queen_weights = [[1, 1, 1, 1, 1, 1, 1, 1],
+                 [1, 2, 2, 2, 2, 2, 2, 1],
+                 [1, 2, 3, 3, 3, 3, 2, 1],
+                 [1, 2, 3, 4, 4, 3, 2, 1],
+                 [1, 2, 3, 4, 4, 3, 2, 1],
+                 [1, 2, 3, 3, 3, 3, 2, 1],
+                 [1, 2, 2, 2, 2, 2, 2, 1],
+                 [1, 1, 1, 1, 1, 1, 1, 1]]
+
+king_weights = [[3, 4, 2, 1, 1, 2, 4, 3],
+                [2, 2, 1, 1, 1, 1, 2, 2],
+                [1, 1, 1, 1, 1, 1, 1, 1],
+                [1, 1, 1, 1, 1, 1, 1, 1],
+                [1, 1, 1, 1, 1, 1, 1, 1],
+                [1, 1, 1, 1, 1, 1, 1, 1],
+                [2, 2, 1, 1, 1, 1, 2, 2],
+                [3, 4, 2, 1, 1, 2, 4, 3]]
+
+# Square values are flipped, so this is opposite of what you'd maybe expect
+white_pawn_weights = [[0, 0, 0, 0, 0, 0, 0, 0],
+                      [1, 1, 1, -1, -1, 1, 1, 1],
+                      [2, 2, 2, 2, 2, 2, 2, 2],
+                      [3, 3, 3, 3, 3, 3, 3, 3],
+                      [4, 4, 4, 4, 4, 4, 4, 4],
+                      [6, 6, 6, 6, 6, 6, 6, 6],
+                      [8, 8, 8, 8, 8, 8, 8, 8],
+                      [8, 8, 8, 8, 8, 8, 8, 8]]
+
+black_pawn_weights = [[8, 8, 8, 8, 8, 8, 8, 8],
+                      [8, 8, 8, 8, 8, 8, 8, 8],
+                      [6, 6, 6, 6, 6, 6, 6, 6],
+                      [4, 4, 4, 4, 4, 4, 4, 4],
+                      [3, 3, 3, 3, 3, 3, 3, 3],
+                      [2, 2, 2, 2, 2, 2, 2, 2],
+                      [1, 1, 1, -1, -1, 1, 1, 1],
+                      [0, 0, 0, 0, 0, 0, 0, 0]]
+
 
 def get_best_move(board, move_queue):
     global best_move, count, moves, top_move_lines
@@ -48,16 +112,18 @@ def nega_max_ab(board, legal_moves, depth, turn_mult, move_queue, alpha=-CHECKMA
 
         val = -nega_max_ab(board, board.legal_moves,
                            depth - 1, -turn_mult, move_queue, -beta, -alpha)
-        board.pop()
         if val > max_eval:
             max_eval = val
             if depth == DEPTH:
                 # top_move_lines.append(moves)
-                #moves = []
+                # moves = []
                 # print(str(top_move_lines) + ": " + str(depth))
                 # moves.append(move)
-                #print(str(move) + ": " + str(turn_mult*evaluate_board(board)))
+                # print(str(move) + ": " + str(turn_mult*evaluate_board(board)))
                 best_move = move
+                top_move_lines.append(move)
+                print(move)
+        board.pop()
         alpha = max(alpha, max_eval)
         if alpha >= beta:
             break
@@ -82,11 +148,14 @@ def evaluate_board(board):
         # piece values
         piece_map = board.piece_map()
         for piece in piece_map:
+            color = piece_map[piece].color
+            weight = get_weight(
+                piece_map[piece].piece_type, piece, color)
             pval = piece_values[piece_map[piece].piece_type]
-            if piece_map[piece].color == chess.WHITE:
-                val += pval
+            if color == chess.WHITE:
+                val += pval*weight
             else:
-                val -= pval
+                val -= pval*weight
 
         og_turn = board.turn
         board.turn = chess.WHITE
@@ -97,3 +166,22 @@ def evaluate_board(board):
         # add more evaluation factors here!!!! """
 
     return val
+
+
+def get_weight(piece_type, piece, color):
+    if piece_type == chess.KNIGHT:
+        return knight_weights[piece//8][piece % 8]
+    elif piece_type == chess.BISHOP:
+        return bishop_weights[piece//8][piece % 8]
+    elif piece_type == chess.ROOK:
+        return rook_weights[piece//8][piece % 8]
+    elif piece_type == chess.QUEEN:
+        return queen_weights[piece//8][piece % 8]
+    elif piece_type == chess.KING:
+        return king_weights[piece//8][piece % 8]
+    elif piece_type == chess.PAWN and color == chess.WHITE:
+        return white_pawn_weights[piece//8][piece % 8]
+    elif piece_type == chess.PAWN and color == chess.BLACK:
+        return black_pawn_weights[piece//8][piece % 8]
+    else:
+        return 1
