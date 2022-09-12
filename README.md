@@ -8,6 +8,10 @@ pip install pygame
 
 pip install numpy
 
+#### To play
+
+run "game.py" file
+
 ### What to do
 
 You can simply play chess vs AI normally, or you can choose to visualize the AI's "thought process."
