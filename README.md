@@ -24,7 +24,7 @@ If visualization is on:
 
 - When the square colors are a dark magenta-like color, that indicates the number of moves in the line being equal to the depth - 2
 
-##### If you are on Windows, a black screen might pop up when not visualizing AI. If this happens, you may have to alt-tab from the black screen, or run this on a different OS (i.e., MacOS). For some reason, this happens on windows when using multithreading and pygame.
+#### If you are on Windows, a black screen might pop up when not visualizing AI. If this happens, you can click onto the side screen where there are buttons such as "Make AI Move" (but don't click the buttons), or run this on a different OS (i.e., MacOS). For some reason, this happens on windows when using multithreading and pygame.
 
 There are buttons on the UI for choosing to show AI thought process, forcing the AI to make a move, and loading a random board state.
 
