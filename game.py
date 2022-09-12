@@ -35,7 +35,7 @@ def main():
         ([BOARD_WIDTH + OPTIONS_WIDTH, BOARD_HEIGHT]), pygame.DOUBLEBUF, pygame.HWSURFACE)
     pygame.display.set_caption("Chess")
     clock = pygame.time.Clock()
-    starting_fen = "7k/p1r2b2/5q2/1p1p1pR1/5P2/P7/1P2Q2P/1K4R1 w - - 0 32"
+    starting_fen = ""
     board = chess.Board() if len(starting_fen) == 0 else chess.Board(starting_fen)
     load_images()
     running = True
@@ -377,7 +377,7 @@ def update_text(screen, board, font, show_ai_moves, ai_thinking, game_over=False
     if game_over:
         text = font.render(game_over_str, True, (255, 255, 255))
         text_rect = text.get_rect(
-            center=(BOARD_WIDTH+OPTIONS_WIDTH/2, 165))
+            center=(BOARD_WIDTH+OPTIONS_WIDTH/2, BOARD_HEIGHT/2-43))
         screen.blit(text, text_rect)
 
     load_button(screen, font, "fen_button")
